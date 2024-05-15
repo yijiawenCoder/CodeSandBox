@@ -2,15 +2,24 @@ package com.yijiawencoder.codesandbox.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
-import com.yijiawencoder.codesandbox.model.codeSandBox.ExecuteCodeRequest;
-import com.yijiawencoder.codesandbox.model.codeSandBox.ExecuteCodeResponse;
+import cn.hutool.core.util.StrUtil;
+import com.yijiawencoder.codesandbox.model.ExecuteCodeRequest;
+import com.yijiawencoder.codesandbox.model.ExecuteCodeResponse;
+import com.yijiawencoder.codesandbox.model.ExecuteMessage;
+import com.yijiawencoder.codesandbox.model.JudgeInfo;
 import com.yijiawencoder.codesandbox.service.CodeSandBox;
+import com.yijiawencoder.codesandbox.utils.ProcessUtils;
+import org.springframework.util.StopWatch;
+import org.springframework.util.StringUtils;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+
 
 public class JavaNativeCodeSandBoxImpl implements CodeSandBox {
     public static final String GLOBAL_CODE_DIR_NAME = "tmpCode";
@@ -49,53 +58,68 @@ public class JavaNativeCodeSandBoxImpl implements CodeSandBox {
         try {
             Process process = Runtime.getRuntime().exec(compileCmd);
             //等待进程执行，返回退出码
-            int exitValue = process.waitFor();
-            if (exitValue == 0) {
-                //正常退出
-                System.out.println("编译成功");
-                //分批获取获得控制台信息
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                //把输出拼成一串
-                StringBuilder compileOutputBuilder = new StringBuilder();
-                //逐行读取
-                String compileOutputLine = bufferedReader.readLine();
-                while ((compileOutputLine = bufferedReader.readLine()) != null) ;
-                {
-                    compileOutputBuilder.append(compileOutputLine);
-                }
-                System.out.println("编译输出：" + compileOutputBuilder.toString());
-
-            } else {
-                //异常退出
-                System.out.println("编译失败，请检查代码");
-                //分批获取获得控制台信息
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                //把输出拼成一串
-                StringBuilder compileOutputBuilder = new StringBuilder();
-                //逐行读取
-                String compileOutputLine = bufferedReader.readLine();
-                while ((compileOutputLine = bufferedReader.readLine()) != null) ;
-                {
-                    compileOutputBuilder.append(compileOutputLine);
-                }
-                System.out.println("编译输出：" + compileOutputBuilder.toString());
-                //分批获取获得控制台信息
-                //获取错误流
-
-                BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-                StringBuilder errorCompileOutputBuilder = new StringBuilder();
-                //逐行读取
-                String errorCompileOutputLine = bufferedReader.readLine();
-                while ((compileOutputLine = bufferedReader.readLine()) != null) ;
-                {
-                    errorCompileOutputBuilder.append("compileOutputLine");
-                }
-
-                System.out.println("编译输出：" + compileOutputBuilder.toString());
-            }
-        } catch (IOException | InterruptedException e) {
+            ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(process, "编译");
+            System.out.println(executeMessage);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return null;
+
+        //执行代码
+        List<ExecuteMessage> executeMessageList = new ArrayList<>();
+        for (String inputArgs : inputList) {
+            StopWatch stopWatch = new StopWatch();
+            String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
+            try {
+                Process runProcess = Runtime.getRuntime().exec(runCmd);
+                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(runProcess, "运行");
+                System.out.println(executeMessage);
+                executeMessageList.add(executeMessage);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        //整理输出
+        ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+        List<String>outPutList = new ArrayList<>();
+        //取用时最大值
+        long maxExecuteTime = 0;
+        for (ExecuteMessage executeMessage : executeMessageList) {
+            if(StrUtil.isNotBlank(executeMessage.getErrorMessage())){
+                String  errorMessage = executeMessage.getErrorMessage();
+                executeCodeResponse.setMessage(errorMessage);
+                //执行中存在错误
+                executeCodeResponse.setStatus(3);
+                break;
+            }
+            Long time = executeMessage.getTime();
+            if(time!=null ){
+                maxExecuteTime = Math.max(maxExecuteTime,time);
+            }
+            outPutList.add(executeMessage.getMessage());
+            executeCodeResponse.setMessage(executeMessage.getMessage());
+
+        }
+        //执行到最后还没有报错
+        executeCodeResponse.setOutList(outPutList);
+        if(outPutList.size()==executeMessageList.size()){
+            executeCodeResponse.setStatus(1);
+        }
+
+        JudgeInfo judgeInfo = new JudgeInfo();
+        //todo 查看内存
+       // judgeInfo.setMemory();
+        judgeInfo.setTime(maxExecuteTime);
+        executeCodeResponse.setJudgeInfo(judgeInfo);
+        //文件清理
+     if(userCodeFile.getParentFile()!=null) {
+         boolean del = FileUtil.del(userCodeFile.getParentFile());
+
+     }
+
+     //错误处理
+
+
+
+        return executeCodeResponse;
     }
 }

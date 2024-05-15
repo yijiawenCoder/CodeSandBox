@@ -1,8 +1,8 @@
 package com.yijiawencoder.codesandbox.service;
 
 
-import com.yijiawencoder.codesandbox.model.codeSandBox.ExecuteCodeRequest;
-import com.yijiawencoder.codesandbox.model.codeSandBox.ExecuteCodeResponse;
+import com.yijiawencoder.codesandbox.model.ExecuteCodeRequest;
+import com.yijiawencoder.codesandbox.model.ExecuteCodeResponse;
 
 /**
  * 代码沙箱接口定义

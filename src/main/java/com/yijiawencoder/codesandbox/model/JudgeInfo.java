@@ -1,4 +1,4 @@
-package com.yijiawencoder.codesandbox.model.codeSandBox;
+package com.yijiawencoder.codesandbox.model;
 
 import lombok.Data;
 
