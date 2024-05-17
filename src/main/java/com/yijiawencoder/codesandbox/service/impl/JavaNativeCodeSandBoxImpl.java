@@ -7,6 +7,7 @@ import com.yijiawencoder.codesandbox.model.ExecuteCodeRequest;
 import com.yijiawencoder.codesandbox.model.ExecuteCodeResponse;
 import com.yijiawencoder.codesandbox.model.ExecuteMessage;
 import com.yijiawencoder.codesandbox.model.JudgeInfo;
+import com.yijiawencoder.codesandbox.security.DefaultSecurityManager;
 import com.yijiawencoder.codesandbox.service.CodeSandBox;
 import com.yijiawencoder.codesandbox.utils.ProcessUtils;
 import org.springframework.util.StopWatch;
@@ -37,6 +38,7 @@ public class JavaNativeCodeSandBoxImpl implements CodeSandBox {
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
+       System.setSecurityManager(new DefaultSecurityManager());
         List<String> inputList = executeCodeRequest.getInputList();
         String code = executeCodeRequest.getCode();
         String language = executeCodeRequest.getLanguage();
